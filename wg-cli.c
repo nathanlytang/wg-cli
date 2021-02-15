@@ -1,11 +1,17 @@
-// #define _GNU_SOURCE
-
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <stdbool.h>
+
+struct flags
+{
+    bool quiet;
+    bool verbose;
+} f1;
 
 /**
  * Creates a new peer file using template.conf as a template
@@ -106,7 +112,7 @@ char *get_key_string(char *command)
 /**
  * Generate a new Wireguard peer file and insert key into interface configuration file
  */
-int create_peer(int argc, char *argv[])
+int create_peer(int argc, char *argv[], struct flags f1)
 {
     // Create wireguard/peers/ directory if not already exists
     struct stat st = {0};
@@ -118,7 +124,10 @@ int create_peer(int argc, char *argv[])
 
     // Generate private key
     char *private_key = get_key_string("wg genkey");
-    // printf("Private Key = %s\n", private_key);
+    if (f1.verbose)
+    {
+        printf("Private Key = %s\n", private_key);
+    }
 
     // Create new peer configuration file in wireguard/peers/
     strcat(peers_dir, argv[2]);
@@ -157,7 +166,11 @@ int create_peer(int argc, char *argv[])
     strcat(pubkey_command, private_key);
     strcat(pubkey_command, "\'");
     char *public_key = get_key_string(pubkey_command);
-    // printf("Public Key = %s\n", public_key);
+    if (f1.verbose)
+    {
+        printf("Public Key = %s\n", public_key);
+        printf("Create new peer file in: %s\n", peers_dir);
+    }
 
     // Open Wireguard interface configuration file named in argv[2]
     wg = fopen(wg_dir, "a");
@@ -170,33 +183,71 @@ int create_peer(int argc, char *argv[])
     // Print QR code
     char qrencode[FILENAME_MAX] = "qrencode -t ansiutf8 < ";
     strcat(qrencode, peers_dir);
-    printf("\nNew peer successfully generated:\n");
-    command_print(qrencode);
+    if (!f1.quiet)
+    {
+        printf("\nNew peer successfully generated:\n");
+        command_print(qrencode);
+    }
 
     return 0;
 }
 
+void print_help_string()
+{
+    char *help_string = "Usage: wg-cli <cmd> [<args>]\n\n"
+                        "Available commands:\n"
+                        "  create-peer: Create a new peer and add to an existing configuration\n";
+    printf("%s", help_string);
+}
+
 int main(int argc, char *argv[])
 {
+    // Check argument flags
+    f1.quiet = false;
+    f1.verbose = false;
+    for (int i = 0; i < argc; i++)
+    {
+        if (!strcmp(argv[i], "-q"))
+        {
+            f1.quiet = true;
+            for (int j = i; j < argc - 1; j++)
+            {
+                argv[j] = argv[j + 1];
+            }
+            argc--;
+            i--;
+        }
+        else if (!strcmp(argv[i], "-v"))
+        {
+            f1.verbose = true;
+            for (int j = i; j < argc - 1; j++)
+            {
+                argv[j] = argv[j + 1];
+            }
+            argc--;
+            i--;
+        }
+    }
 
     // If arguments empty or help
     if (argc == 1 || !strcmp(argv[1], "help") || !strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))
     {
-        char *help_string = "Usage: wg-cli <cmd> [<args>]\n\n"
-                            "Available commands:\n"
-                            "  create-peer: Create a new peer and add to an existing configuration\n";
-        printf("%s", help_string);
+        print_help_string();
         return 0;
     }
 
     if (!strcmp(argv[1], "create-peer"))
     {
-        if (argc < 3 || !strcmp(argv[2], "help") || !strcmp(argv[2], "-h") || !strcmp(argv[2], "--help"))
+        if (argc < 5 || !strcmp(argv[2], "help") || !strcmp(argv[2], "-h") || !strcmp(argv[2], "--help"))
         {
             fprintf(stderr, "Usage: wg-cli create-peer <Interface> <Peer Name> <Address>\n");
             return 1;
         }
-        create_peer(argc, argv);
+        create_peer(argc, argv, f1);
         return 0;
     }
+
+    printf("Invalid command: '%s'\n", argv[1]);
+    print_help_string();
+    return 1;
 }
