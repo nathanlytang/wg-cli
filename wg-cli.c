@@ -11,7 +11,14 @@ struct flags
 {
     bool quiet;
     bool verbose;
-} f1;
+};
+
+struct directories
+{
+    char peers_dir[FILENAME_MAX];
+    char wg_dir[FILENAME_MAX];
+    char template_dir[FILENAME_MAX];
+};
 
 /**
  * Creates a new peer file using template.conf as a template
@@ -111,15 +118,19 @@ char *get_key_string(char *command)
 
 /**
  * Generate a new Wireguard peer file and insert key into interface configuration file
+ * 
+ * @param argc Number of arguments
+ * @param argv Array of arguments
+ * @param dir1 Directory locations
+ * @param f1 Argument flags
  */
-int create_peer(int argc, char *argv[], struct flags f1)
+int create_peer(int argc, char *argv[], struct directories dir1, struct flags f1)
 {
     // Create wireguard/peers/ directory if not already exists
     struct stat st = {0};
-    char peers_dir[FILENAME_MAX] = "/etc/wireguard/peers/";
-    if (stat(peers_dir, &st) == -1)
+    if (stat(dir1.peers_dir, &st) == -1)
     {
-        mkdir(peers_dir, 0700);
+        mkdir(dir1.peers_dir, 0700);
     }
 
     // Generate private key
@@ -130,14 +141,14 @@ int create_peer(int argc, char *argv[], struct flags f1)
     }
 
     // Create new peer configuration file in wireguard/peers/
-    strcat(peers_dir, argv[2]);
-    strcat(peers_dir, "-");
-    strcat(peers_dir, argv[3]);
-    strcat(peers_dir, ".conf");
+    strcat(dir1.peers_dir, argv[2]);
+    strcat(dir1.peers_dir, "-");
+    strcat(dir1.peers_dir, argv[3]);
+    strcat(dir1.peers_dir, ".conf");
 
     // Check if configuration file with filename = argv[3] already exists
     FILE *peer;
-    if ((peer = fopen(peers_dir, "r")))
+    if ((peer = fopen(dir1.peers_dir, "r")))
     {
         fclose(peer);
         free(private_key);
@@ -146,11 +157,10 @@ int create_peer(int argc, char *argv[], struct flags f1)
     }
 
     // Check if Wireguard interface exists
-    char wg_dir[FILENAME_MAX] = "/etc/wireguard/";
-    strcat(wg_dir, argv[2]);
-    strcat(wg_dir, ".conf");
+    strcat(dir1.wg_dir, argv[2]);
+    strcat(dir1.wg_dir, ".conf");
     FILE *wg;
-    if (!(wg = fopen(wg_dir, "r")))
+    if (!(wg = fopen(dir1.wg_dir, "r")))
     {
         free(private_key);
         printf("Aborted: Interface \"%s\" not found\n", argv[2]);
@@ -158,8 +168,7 @@ int create_peer(int argc, char *argv[], struct flags f1)
     }
 
     // Copy template file to peers directory and replace private key and address
-    char template_dir[FILENAME_MAX] = "/etc/wg-cli/template.conf";
-    create_config(template_dir, peers_dir, private_key, argv[4]);
+    create_config(dir1.template_dir, dir1.peers_dir, private_key, argv[4]);
 
     // Generate public key using private key
     char pubkey_command[100] = "bash -c \'wg pubkey <<< ";
@@ -169,11 +178,11 @@ int create_peer(int argc, char *argv[], struct flags f1)
     if (f1.verbose)
     {
         printf("Public Key = %s\n", public_key);
-        printf("Create new peer file in: %s\n", peers_dir);
+        printf("Create new peer file in: %s\n", dir1.peers_dir);
     }
 
     // Open Wireguard interface configuration file named in argv[2]
-    wg = fopen(wg_dir, "a");
+    wg = fopen(dir1.wg_dir, "a");
     fprintf(wg, "\n[Peer]\nPublicKey = %s\nAllowedIPs = %s/32\n", public_key, argv[4]);
     fclose(wg);
 
@@ -182,7 +191,7 @@ int create_peer(int argc, char *argv[], struct flags f1)
 
     // Print QR code
     char qrencode[FILENAME_MAX] = "qrencode -t ansiutf8 < ";
-    strcat(qrencode, peers_dir);
+    strcat(qrencode, dir1.peers_dir);
     if (!f1.quiet)
     {
         printf("\nNew peer successfully generated:\n");
@@ -192,17 +201,177 @@ int create_peer(int argc, char *argv[], struct flags f1)
     return 0;
 }
 
+/**
+ * Remove Wireguard peer from the interface configuration and delete the peer configuration file
+ * 
+ * @param argc Number of arguments
+ * @param argv Array of arguments
+ * @param dir1 Directory locations
+ * @param f1 Argument flags
+ */
+int remove_peer(int argc, char *argv[], struct directories dir1, struct flags f1)
+{
+    char temp_dir[FILENAME_MAX];
+    strcpy(temp_dir, dir1.wg_dir);
+
+    // Check if Wireguard interface exists
+    strcat(dir1.wg_dir, argv[2]);
+    strcat(dir1.wg_dir, ".conf");
+    FILE *wg;
+    if (!(wg = fopen(dir1.wg_dir, "r")))
+    {
+        printf("Aborted: Interface \"%s\" not found\n", argv[2]);
+        return 1;
+    }
+
+    // Find peer configuration file
+    strcat(dir1.peers_dir, argv[2]);
+    strcat(dir1.peers_dir, "-");
+    strcat(dir1.peers_dir, argv[3]);
+    strcat(dir1.peers_dir, ".conf");
+    FILE *peer;
+    if (!(peer = fopen(dir1.peers_dir, "r")))
+    {
+        printf("Aborted: Peer configuration file \"%s\" not found\n", argv[3]);
+        return 1;
+    }
+
+    // Grab privatekey from peer configuration file
+    char line[1024];
+    char *private_key;
+    while (fgets(line, sizeof(line), peer) != NULL)
+    {
+        if (strstr(line, "PrivateKey") != NULL)
+        {
+            private_key = strtok(line, " = ");
+            private_key = strtok(NULL, " = ");
+            strcat(private_key, "=");
+            if (f1.verbose)
+            {
+                printf("Private key = %s\n", private_key);
+            }
+            break;
+        }
+    }
+    fclose(peer);
+
+    // Convert private key to public key
+    char pubkey_command[100] = "bash -c \'wg pubkey <<< ";
+    strcat(pubkey_command, private_key);
+    strcat(pubkey_command, "\'");
+    char *public_key = get_key_string(pubkey_command);
+    if (f1.verbose)
+    {
+        printf("Public key = %s\n", public_key);
+    }
+
+    // Find peer in interface configuration file from public key and delete peer
+    FILE *temp, *wg2;
+    strcat(temp_dir, "temp");
+    temp = fopen(temp_dir, "w");
+    wg = fopen(dir1.wg_dir, "r");
+    int counter = 0;
+    int skip_lines = 3;
+    char temp_line[1024];
+    bool found = false;
+    while (fgets(line, sizeof(line), wg) != NULL)
+    {
+        if (found && (skip_lines != 0))
+        {
+            skip_lines--;
+        }
+        else if (!found)
+        {
+            counter++;
+            if (strstr(line, "[Peer]") != NULL)
+            {
+                wg2 = fopen(dir1.wg_dir, "r");
+                for (int i = 0; i < counter + 1; i++)
+                {
+                    fgets(temp_line, sizeof(temp_line), wg2);
+                }
+                if (strstr(temp_line, public_key) != NULL)
+                {
+                    found = true;
+                    if (f1.verbose)
+                    {
+                        printf("Found peer in interface: %s", temp_line);
+                    }
+                }
+                else
+                {
+                    fprintf(temp, "%s", line);
+                }
+                fclose(wg2);
+            }
+            else
+            {
+                fprintf(temp, "%s", line);
+            }
+        }
+        else if (found && (skip_lines == 0))
+        {
+            fprintf(temp, "%s", line);
+        }
+    }
+    free(public_key);
+    fclose(wg);
+    fclose(temp);
+
+    // Rename temporary file and delete old interface file
+    int delete_temp = remove(dir1.wg_dir);
+    int rename_temp = rename(temp_dir, dir1.wg_dir);
+    if (!delete_temp && !rename_temp && !f1.quiet)
+    {
+        printf("Interface \"%s\" sucessfully updated\n", argv[2]);
+    }
+    else if (!f1.quiet)
+    {
+        printf("Error: Unable to update interface \"%s\"\n", argv[2]);
+    }
+
+    // Delete peer configuration file
+    int delete_peer = remove(dir1.peers_dir);
+    if (!delete_peer)
+    {
+        printf("Peer configuration file for \"%s\" deleted successfully\n", argv[3]);
+    }
+    else
+    {
+        printf("Error: Unable to delete peer configuration file for \"%s\"", argv[3]);
+    }
+
+    return 0;
+}
+
+/**
+ * Prints the help string to stdout
+ */
 void print_help_string()
 {
     char *help_string = "Usage: wg-cli <cmd> [<args>]\n\n"
                         "Available commands:\n"
-                        "  create-peer: Create a new peer and add to an existing configuration\n";
+                        "  show: Show existing peers\n"
+                        "  create-peer: Create a new peer and add to an existing interface configuration file\n"
+                        "  remove-peer: Remove an existing peer from the interface configuration file\n\n"
+                        "Flags:\n"
+                        "-q quiet -v verbose\n";
     printf("%s", help_string);
 }
 
+/**
+ * Main
+ */
 int main(int argc, char *argv[])
 {
+    // Directories
+    struct directories dir1;
+    strcpy(dir1.peers_dir, "/etc/wireguard/peers/");
+    strcpy(dir1.wg_dir, "/etc/wireguard/");
+    strcpy(dir1.template_dir, "/etc/wg-cli/template.conf");
+
     // Check argument flags
+    struct flags f1;
     f1.quiet = false;
     f1.verbose = false;
     for (int i = 0; i < argc; i++)
@@ -243,7 +412,18 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Usage: wg-cli create-peer <Interface> <Peer Name> <Address>\n");
             return 1;
         }
-        create_peer(argc, argv, f1);
+        create_peer(argc, argv, dir1, f1);
+        return 0;
+    }
+
+    if (!strcmp(argv[1], "remove-peer"))
+    {
+        if (argc < 4 || !strcmp(argv[2], "help") || !strcmp(argv[2], "-h") || !strcmp(argv[2], "--help"))
+        {
+            fprintf(stderr, "Usage: wg-cli remove-peer <Interface> <Peer Name>\n");
+            return 1;
+        }
+        remove_peer(argc, argv, dir1, f1);
         return 0;
     }
 
