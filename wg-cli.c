@@ -314,14 +314,20 @@ int remove_peer(int argc, char *argv[], struct directories dir1, struct flags f1
             fprintf(temp, "%s", line);
         }
     }
+    if (!found && !f1.quiet)
+    {
+        printf("Error: Peer \"%s\" not found in interface \"%s\"\n", argv[3], argv[2]);
+        remove(temp_dir);
+        return 1;
+    }
     free(public_key);
     fclose(wg);
     fclose(temp);
 
     // Rename temporary file and delete old interface file
-    int delete_temp = remove(dir1.wg_dir);
+    int delete_old = remove(dir1.wg_dir);
     int rename_temp = rename(temp_dir, dir1.wg_dir);
-    if (!delete_temp && !rename_temp && !f1.quiet)
+    if (!delete_old && !rename_temp && !f1.quiet)
     {
         printf("Interface \"%s\" sucessfully updated\n", argv[2]);
     }
@@ -332,11 +338,11 @@ int remove_peer(int argc, char *argv[], struct directories dir1, struct flags f1
 
     // Delete peer configuration file
     int delete_peer = remove(dir1.peers_dir);
-    if (!delete_peer)
+    if (!delete_peer && !f1.quiet)
     {
         printf("Peer configuration file for \"%s\" deleted successfully\n", argv[3]);
     }
-    else
+    else if (!f1.quiet)
     {
         printf("Error: Unable to delete peer configuration file for \"%s\"", argv[3]);
     }
@@ -345,12 +351,25 @@ int remove_peer(int argc, char *argv[], struct directories dir1, struct flags f1
 }
 
 /**
+ * Shows peers belonging to an existing interface
+ * 
+ * @param argc Number of arguments
+ * @param argv Array of arguments
+ * @param dir1 Directory locations
+ * @param f1 Argument flags
+ */
+int show(int argc, char *argv[], struct directories dir1, struct flags f1)
+{
+    return 0;
+}
+
+/**
  * Prints the help string to stdout
  */
-void print_help_string()
+void print_help_string(char *PROG_NAME)
 {
-    char *help_string = "Usage: wg-cli <cmd> [<args>]\n\n"
-                        "Available commands:\n"
+    printf("Usage: %s <cmd> [<args>]\n\n", PROG_NAME);
+    char *help_string = "Available commands:\n"
                         "  show: Show existing peers\n"
                         "  create-peer: Create a new peer and add to an existing interface configuration file\n"
                         "  remove-peer: Remove an existing peer from the interface configuration file\n\n"
@@ -364,6 +383,7 @@ void print_help_string()
  */
 int main(int argc, char *argv[])
 {
+    char *PROG_NAME = argv[0];
     // Directories
     struct directories dir1;
     strcpy(dir1.peers_dir, "/etc/wireguard/peers/");
@@ -401,15 +421,26 @@ int main(int argc, char *argv[])
     // If arguments empty or help
     if (argc == 1 || !strcmp(argv[1], "help") || !strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))
     {
-        print_help_string();
+        print_help_string(PROG_NAME);
+        return 0;
+    }
+
+    if (!strcmp(argv[1], "show"))
+    {
+        if ((argc == 3 && (!strcmp(argv[2], "help") || !strcmp(argv[2], "-h") || !strcmp(argv[2], "--help"))) || argc > 3)
+        {
+            fprintf(stderr, "Usage: %s show [<interface>]\n", PROG_NAME);
+            return 1;
+        }
+        show(argc, argv, dir1, f1);
         return 0;
     }
 
     if (!strcmp(argv[1], "create-peer"))
     {
-        if (argc < 5 || !strcmp(argv[2], "help") || !strcmp(argv[2], "-h") || !strcmp(argv[2], "--help"))
+        if (argc != 5 || !strcmp(argv[2], "help") || !strcmp(argv[2], "-h") || !strcmp(argv[2], "--help"))
         {
-            fprintf(stderr, "Usage: wg-cli create-peer <Interface> <Peer Name> <Address>\n");
+            fprintf(stderr, "Usage: %s create-peer <Interface> <Peer Name> <Address>\n", PROG_NAME);
             return 1;
         }
         create_peer(argc, argv, dir1, f1);
@@ -418,9 +449,9 @@ int main(int argc, char *argv[])
 
     if (!strcmp(argv[1], "remove-peer"))
     {
-        if (argc < 4 || !strcmp(argv[2], "help") || !strcmp(argv[2], "-h") || !strcmp(argv[2], "--help"))
+        if (argc != 4 || !strcmp(argv[2], "help") || !strcmp(argv[2], "-h") || !strcmp(argv[2], "--help"))
         {
-            fprintf(stderr, "Usage: wg-cli remove-peer <Interface> <Peer Name>\n");
+            fprintf(stderr, "Usage: %s remove-peer <Interface> <Peer Name>\n", PROG_NAME);
             return 1;
         }
         remove_peer(argc, argv, dir1, f1);
@@ -428,6 +459,6 @@ int main(int argc, char *argv[])
     }
 
     printf("Invalid command: '%s'\n", argv[1]);
-    print_help_string();
+    print_help_string(PROG_NAME);
     return 1;
 }
