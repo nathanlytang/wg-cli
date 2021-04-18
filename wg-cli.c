@@ -26,7 +26,7 @@ struct directories
  * @param source Template file
  * @param dest Destination/peer file
  * @param private_key Private key to be inserted in destination
- * @param address IP address to be inserted in destination
+ * @param address IP address to be inserted in destination in CIDR notation
 */
 void create_config(char *source, char *dest, char *private_key, char *address)
 {
@@ -58,7 +58,7 @@ void create_config(char *source, char *dest, char *private_key, char *address)
         else if (strstr(line, "Address") != NULL)
         {
             strtok(line, "\n");
-            fprintf(dest_file, "Address = %s/24\n", address);
+            fprintf(dest_file, "Address = %s\n", address);
         }
         else
         {
@@ -181,9 +181,16 @@ int create_peer(int argc, char *argv[], struct directories dir1, struct flags f1
         printf("Create new peer file in: %s\n", dir1.peers_dir);
     }
 
+    // Remove CIDR notation from IP address
+    char address[20];
+    memcpy(address, argv[4], 20);
+    for (int i = 0; i < 3; i++) {
+        address[strlen(address)-1] = '\0';
+    }
+
     // Open Wireguard interface configuration file named in argv[2]
     wg = fopen(dir1.wg_dir, "a");
-    fprintf(wg, "\n[Peer]\nPublicKey = %s\nAllowedIPs = %s/32\n", public_key, argv[4]);
+    fprintf(wg, "\n[Peer]\nPublicKey = %s\nAllowedIPs = %s/32\n", public_key, address);
     fclose(wg);
 
     free(private_key);
@@ -440,7 +447,7 @@ int main(int argc, char *argv[])
     {
         if (argc != 5 || !strcmp(argv[2], "help") || !strcmp(argv[2], "-h") || !strcmp(argv[2], "--help"))
         {
-            fprintf(stderr, "Usage: %s create-peer <Interface> <Peer Name> <Address>\n", PROG_NAME);
+            fprintf(stderr, "Usage: %s create-peer <Interface> <Peer Name> <CIDR IP>\n", PROG_NAME);
             return 1;
         }
         create_peer(argc, argv, dir1, f1);
