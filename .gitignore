@@ -58,3 +58,4 @@ dkms.conf
 *.conf
 *-privatekey
 *-publickey
+wg-cli
