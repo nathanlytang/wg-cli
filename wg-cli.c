@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <dirent.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -382,6 +383,105 @@ int remove_peer(int argc, char *argv[], struct directories dir1,
 }
 
 /**
+ * Shows peers for a specific interface.
+ *
+ * Iterates over /etc/wireguard/peers/ for files matching the pattern:
+ * <interface_name>-<peer_name>.conf
+ *
+ * If a matching file is found, it extracts and displays the peer name and
+ * AllowedIPs.
+ *
+ * @param interface_name The name of the WireGuard interface (e.g., "wg0").
+ * @param dir1 Directory locations.
+ * @param f1 Argument flags.
+ */
+void show_interface(char *interface_name, struct directories dir1,
+                    struct flags f1)
+{
+    // Construct the interface configuration file path
+    char interface_config_path[FILENAME_MAX];
+    snprintf(interface_config_path, sizeof(interface_config_path), "%s%s.conf", dir1.wg_dir, interface_name);
+
+    // Check if the interface configuration file exists
+    if (access(interface_config_path, F_OK) == -1) {
+        printf("Interface: %s does not exist\n", interface_name);
+        return;
+    }
+
+    DIR *d;
+    struct dirent *dir;
+    d = opendir(dir1.peers_dir);
+
+    if (d)
+    {
+        printf("Interface: %s\n", interface_name);
+        while ((dir = readdir(d)) != NULL)
+        {
+            // Check if the file is a regular file and matches the pattern
+            if (dir->d_type == DT_REG)
+            {
+                char peer_name[FILENAME_MAX];
+                char file_interface_name[FILENAME_MAX];
+                int matches = sscanf(dir->d_name, "%[^-]-%[^.].conf",
+                                     file_interface_name, peer_name);
+
+                if (matches == 2 &&
+                    strcmp(file_interface_name, interface_name) == 0)
+                {
+                    // Construct the full file path
+                    char file_path[FILENAME_MAX];
+                    snprintf(file_path, sizeof(file_path), "%s%s",
+                             dir1.peers_dir, dir->d_name);
+
+                    // Open the peer configuration file
+                    FILE *peer_file = fopen(file_path, "r");
+                    if (peer_file)
+                    {
+                        char line[1024];
+                        char allowed_ips[256] =
+                            ""; // Initialize to empty string
+
+                        while (fgets(line, sizeof(line), peer_file) != NULL)
+                        {
+                            if (strstr(line, "AllowedIPs") != NULL)
+                            {
+                                // Extract AllowedIPs
+                                char *temp = strstr(line, "=");
+                                if (temp != NULL)
+                                {
+                                    temp++; // move past the = sign
+                                    while (*temp == ' ')
+                                        temp++; // remove any spaces
+                                    strcpy(allowed_ips, temp);
+                                    strtok(allowed_ips, "\n");
+                                }
+                            }
+                        }
+                        fclose(peer_file);
+
+                        // Print peer information
+                        printf("  Peer Name: %s\n", peer_name);
+                        printf("  Allowed IPs: %s\n", allowed_ips);
+                        printf("\n");
+                    }
+                    else
+                    {
+                        fprintf(stderr,
+                                "Error opening peer configuration file: %s\n",
+                                file_path);
+                    }
+                }
+            }
+        }
+        closedir(d);
+    }
+    else
+    {
+        perror("Error opening peers directory");
+    }
+}
+
+/**
  * Shows peers belonging to an existing interface
  *
  * @param argc Number of arguments
@@ -389,8 +489,37 @@ int remove_peer(int argc, char *argv[], struct directories dir1,
  * @param dir1 Directory locations
  * @param f1 Argument flags
  */
-int show(int argc, char *argv[], struct directories dir1, struct flags f1)
-{
+int show(int argc, char *argv[], struct directories dir1, struct flags f1) {
+    if (argc == 2) {
+        // If no interface is specified, show all interfaces and their peers
+        DIR *d;
+        struct dirent *dir;
+        d = opendir(dir1.wg_dir);
+        if (d) {
+            while ((dir = readdir(d)) != NULL) {
+                // Check if the file is a .conf file and not a directory
+                if (dir->d_type == DT_REG) {
+                    size_t len = strlen(dir->d_name);
+                    if (len > 5 && strcmp(dir->d_name + len - 5, ".conf") == 0) { // Correctly check for .conf at the end
+                        // Extract interface name
+                        char interface_name[FILENAME_MAX];
+                        strcpy(interface_name, dir->d_name);
+                        interface_name[len - 5] = '\0'; // Remove ".conf"
+
+                        // Show peers for this interface
+                        show_interface(interface_name, dir1, f1);
+                    }
+                }
+            }
+            closedir(d);
+        } else {
+            perror("Error opening /etc/wireguard directory");
+            return 1;
+        }
+
+    } else if (argc == 3) {
+        show_interface(argv[2], dir1, f1);
+    }
     return 0;
 }
 
