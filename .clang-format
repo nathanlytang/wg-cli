@@ -5,3 +5,4 @@ BreakBeforeBraces: Allman
 AllowShortIfStatementsOnASingleLine: false
 IndentCaseLabels: false
 AllowShortFunctionsOnASingleLine: Inline
+ColumnLimit: 120

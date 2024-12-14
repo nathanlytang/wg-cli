@@ -594,7 +594,32 @@ int main(int argc, char *argv[])
                            !strcmp(argv[2], "--help"))) ||
             argc > 3)
         {
-            fprintf(stderr, "Usage: %s show [<interface>]\n", PROG_NAME);
+            fprintf(stderr, "Usage: %s show [<interface>]\n\n",
+                    PROG_NAME);
+
+            fprintf(stderr, "Arguments:\n");
+            fprintf(stderr,
+                    "  [<interface>]: The name of the WireGuard interface "
+                    "(e.g., wg0). If omitted, all interfaces are "
+                    "shown.\n\n");
+
+            fprintf(stderr, "Description:\n");
+            fprintf(stderr, "  Displays information about WireGuard peers "
+                            "for the specified interface, or all "
+                            "interfaces if none is provided.\n");
+            fprintf(stderr, "  The output includes peer public keys, "
+                            "allowed IPs, and other relevant details.\n\n");
+
+            fprintf(stderr, "Example:\n");
+            fprintf(stderr, "  %s show wg0\n",
+                    PROG_NAME);
+            fprintf(stderr, "  This shows the peers configured for "
+                            "interface 'wg0'.\n\n");
+            fprintf(stderr, "  %s show\n",
+                    PROG_NAME);
+            fprintf(stderr, "  This shows all configured WireGuard "
+                            "interfaces and their peers.\n");
+
             return 1;
         }
         show(argc, argv, dir1, f1);
@@ -607,8 +632,44 @@ int main(int argc, char *argv[])
             !strcmp(argv[2], "--help"))
         {
             fprintf(stderr,
-                    "Usage: %s create-peer <Interface> <Peer Name> <CIDR IP>\n",
+                    "Usage: %s create-peer <interface> <peer-name> "
+                    "<allowed-ips>\n\n",
                     PROG_NAME);
+
+            fprintf(stderr, "Creates a new WireGuard peer configuration.\n\n");
+
+            fprintf(stderr, "Arguments:\n");
+            fprintf(stderr, "  <interface>:   The name of the WireGuard "
+                            "interface (e.g., wg0).\n");
+            fprintf(stderr, "  <peer-name>:   A descriptive name for the "
+                            "peer (e.g., phone, laptop).\n");
+            fprintf(stderr,
+                    "  <allowed-ips>: The IP address(es) or CIDR block(s) "
+                    "that the peer will be allowed to access\n");
+            fprintf(stderr, "                 through the tunnel (e.g., "
+                            "192.168.2.10/32 or 10.0.0.0/24. Use 0.0.0.0/0 "
+                            "for all).\n\n");
+
+            fprintf(stderr, "This command does the following:\n");
+            fprintf(stderr, "1. Generates a new private and public key "
+                            "pair for the peer.\n");
+            fprintf(stderr,
+                    "2. Creates a new peer configuration file named "
+                    "<interface>-<peer-name>.conf in /etc/wireguard/peers/.\n");
+            fprintf(stderr, "3. Adds the peer's public key and allowed IPs "
+                            "to the interface configuration file "
+                            "(/etc/wireguard/<interface>.conf).\n");
+            fprintf(stderr, "4. Displays a QR code of the peer "
+                            "configuration for easy mobile setup.\n");
+            fprintf(stderr, "5. Restarts the WireGuard interface to apply "
+                            "the changes.\n\n");
+
+            fprintf(stderr, "Example:\n");
+            fprintf(stderr, "  %s create-peer wg0 phone 192.168.2.10/32\n",
+                    PROG_NAME);
+            fprintf(stderr, "  This creates a peer named 'phone' on interface "
+                            "'wg0', allowing access to 192.168.2.10.\n");
+
             return 1;
         }
         create_peer(argc, argv, dir1, f1);
@@ -620,8 +681,31 @@ int main(int argc, char *argv[])
         if (argc != 4 || !strcmp(argv[2], "help") || !strcmp(argv[2], "-h") ||
             !strcmp(argv[2], "--help"))
         {
-            fprintf(stderr, "Usage: %s remove-peer <Interface> <Peer Name>\n",
+            fprintf(stderr, "Usage: %s remove-peer <interface> <peer-name>\n\n",
                     PROG_NAME);
+
+            fprintf(stderr, "Removes a WireGuard peer configuration.\n\n");
+
+            fprintf(stderr, "Arguments:\n");
+            fprintf(stderr, "  <interface>: The name of the WireGuard "
+                            "interface (e.g., wg0).\n");
+            fprintf(stderr, "  <peer-name>: The descriptive name of the "
+                            "peer to remove (e.g., phone, laptop).\n\n");
+            fprintf(stderr, "This command does the following:\n");
+            fprintf(stderr,
+                    "1. Removes the peer's entry from the interface "
+                    "configuration file (/etc/wireguard/<interface>.conf).\n");
+            fprintf(stderr, "2. Deletes the peer's configuration file "
+                            "(named <interface>-<peer-name>.conf) from "
+                            "/etc/wireguard/peers/.\n");
+            fprintf(stderr, "3. Restarts the WireGuard interface to apply "
+                            "the changes.\n\n");
+
+            fprintf(stderr, "Example:\n");
+            fprintf(stderr, "  %s remove-peer wg0 phone\n", PROG_NAME);
+            fprintf(stderr, "  This removes the peer named 'phone' from "
+                            "the interface 'wg0'.\n");
+
             return 1;
         }
         remove_peer(argc, argv, dir1, f1);
