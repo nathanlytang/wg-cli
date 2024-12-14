@@ -10,6 +10,16 @@ A tool to automate and manage WireGuard™ peers.
 4. Fill out `template.conf` in `/etc/wg-cli/`, leaving "PrivateKey" and "Address" blank.
 
 ### Usage
-- create-peer: Generates a new peer configuration file and copies the peer into the Wireguard™ interface configuration file.
-- remove-peer: Removes an existing peer from the interface configuration file and deletes the peer configuration file.
-- show: 🚧 In progress 🚧
+
+*   **`show [<interface>]`**: Displays information about WireGuard peers.
+    *   If `interface` is provided, shows peers for the specified interface.
+    *   If `interface` is omitted, shows all configured interfaces and their peers.
+
+*   **`create-peer <interface> <peer-name> <allowed-ips>`**: Creates a new WireGuard peer.
+    *   `interface`: The WireGuard interface name (e.g., `wg0`).
+    *   `peer-name`:  A descriptive name for the peer (e.g., `phone`, `laptop`).
+    *   `allowed-ips`: The IP address(es) or CIDR block(s) the peer is allowed to access (e.g., `192.168.2.10/32`, `10.0.0.0/24`).
+
+*   **`remove-peer <interface> <peer-name>`**: Removes a WireGuard peer.
+    *   `interface`: The WireGuard interface name.
+    *   `peer-name`: The name of the peer to remove.
