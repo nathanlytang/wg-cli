@@ -1,11 +1,11 @@
 #define _GNU_SOURCE
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <stdbool.h>
+#include <unistd.h>
 
 struct flags
 {
@@ -22,12 +22,12 @@ struct directories
 
 /**
  * Creates a new peer file using template.conf as a template
- * 
+ *
  * @param source Template file
  * @param dest Destination/peer file
  * @param private_key Private key to be inserted in destination
  * @param address IP address to be inserted in destination in CIDR notation
-*/
+ */
 void create_config(char *source, char *dest, char *private_key, char *address)
 {
     FILE *source_file, *dest_file;
@@ -70,11 +70,11 @@ void create_config(char *source, char *dest, char *private_key, char *address)
     fclose(dest_file);
 }
 
-/** 
+/**
  * Calls a command in the shell and prints stdout
- * 
+ *
  * @param command Shell command to be executed
-*/
+ */
 void command_print(char *command)
 {
     FILE *fp;
@@ -97,7 +97,7 @@ void command_print(char *command)
 
 /**
  * Executes a shell command and returns stdout
- * 
+ *
  * @param command Shell command to be executed
  * @return Returns stdout as char array
  */
@@ -117,14 +117,16 @@ char *get_key_string(char *command)
 }
 
 /**
- * Generate a new Wireguard peer file and insert key into interface configuration file
- * 
+ * Generate a new Wireguard peer file and insert key into interface
+ * configuration file
+ *
  * @param argc Number of arguments
  * @param argv Array of arguments
  * @param dir1 Directory locations
  * @param f1 Argument flags
  */
-int create_peer(int argc, char *argv[], struct directories dir1, struct flags f1)
+int create_peer(int argc, char *argv[], struct directories dir1,
+                struct flags f1)
 {
     // Create wireguard/peers/ directory if not already exists
     struct stat st = {0};
@@ -152,7 +154,9 @@ int create_peer(int argc, char *argv[], struct directories dir1, struct flags f1
     {
         fclose(peer);
         free(private_key);
-        printf("Aborted: Configuration with filename \"%s-%s.conf\" already exists\n", argv[2], argv[3]);
+        printf("Aborted: Configuration with filename \"%s-%s.conf\" already "
+               "exists\n",
+               argv[2], argv[3]);
         return 1;
     }
 
@@ -184,13 +188,15 @@ int create_peer(int argc, char *argv[], struct directories dir1, struct flags f1
     // Remove CIDR notation from IP address
     char address[20];
     memcpy(address, argv[4], 20);
-    for (int i = 0; i < 3; i++) {
-        address[strlen(address)-1] = '\0';
+    for (int i = 0; i < 3; i++)
+    {
+        address[strlen(address) - 1] = '\0';
     }
 
     // Open Wireguard interface configuration file named in argv[2]
     wg = fopen(dir1.wg_dir, "a");
-    fprintf(wg, "\n[Peer]\nPublicKey = %s\nAllowedIPs = %s/32\n", public_key, address);
+    fprintf(wg, "\n[Peer]\nPublicKey = %s\nAllowedIPs = %s/32\n", public_key,
+            address);
     fclose(wg);
 
     free(private_key);
@@ -209,14 +215,16 @@ int create_peer(int argc, char *argv[], struct directories dir1, struct flags f1
 }
 
 /**
- * Remove Wireguard peer from the interface configuration and delete the peer configuration file
- * 
+ * Remove Wireguard peer from the interface configuration and delete the peer
+ * configuration file
+ *
  * @param argc Number of arguments
  * @param argv Array of arguments
  * @param dir1 Directory locations
  * @param f1 Argument flags
  */
-int remove_peer(int argc, char *argv[], struct directories dir1, struct flags f1)
+int remove_peer(int argc, char *argv[], struct directories dir1,
+                struct flags f1)
 {
     char temp_dir[FILENAME_MAX];
     strcpy(temp_dir, dir1.wg_dir);
@@ -323,7 +331,8 @@ int remove_peer(int argc, char *argv[], struct directories dir1, struct flags f1
     }
     if (!found && !f1.quiet)
     {
-        printf("Error: Peer \"%s\" not found in interface \"%s\"\n", argv[3], argv[2]);
+        printf("Error: Peer \"%s\" not found in interface \"%s\"\n", argv[3],
+               argv[2]);
         remove(temp_dir);
         return 1;
     }
@@ -347,11 +356,13 @@ int remove_peer(int argc, char *argv[], struct directories dir1, struct flags f1
     int delete_peer = remove(dir1.peers_dir);
     if (!delete_peer && !f1.quiet)
     {
-        printf("Peer configuration file for \"%s\" deleted successfully\n", argv[3]);
+        printf("Peer configuration file for \"%s\" deleted successfully\n",
+               argv[3]);
     }
     else if (!f1.quiet)
     {
-        printf("Error: Unable to delete peer configuration file for \"%s\"", argv[3]);
+        printf("Error: Unable to delete peer configuration file for \"%s\"",
+               argv[3]);
     }
 
     return 0;
@@ -359,7 +370,7 @@ int remove_peer(int argc, char *argv[], struct directories dir1, struct flags f1
 
 /**
  * Shows peers belonging to an existing interface
- * 
+ *
  * @param argc Number of arguments
  * @param argv Array of arguments
  * @param dir1 Directory locations
@@ -378,8 +389,10 @@ void print_help_string(char *PROG_NAME)
     printf("Usage: %s <cmd> [<args>]\n\n", PROG_NAME);
     char *help_string = "Available commands:\n"
                         "  show: Show existing peers\n"
-                        "  create-peer: Create a new peer and add to an existing interface configuration file\n"
-                        "  remove-peer: Remove an existing peer from the interface configuration file\n\n"
+                        "  create-peer: Create a new peer and add to an "
+                        "existing interface configuration file\n"
+                        "  remove-peer: Remove an existing peer from the "
+                        "interface configuration file\n\n"
                         "Flags:\n"
                         "-q quiet -v verbose\n";
     printf("%s", help_string);
@@ -426,7 +439,8 @@ int main(int argc, char *argv[])
     }
 
     // If arguments empty or help
-    if (argc == 1 || !strcmp(argv[1], "help") || !strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))
+    if (argc == 1 || !strcmp(argv[1], "help") || !strcmp(argv[1], "-h") ||
+        !strcmp(argv[1], "--help"))
     {
         print_help_string(PROG_NAME);
         return 0;
@@ -434,7 +448,9 @@ int main(int argc, char *argv[])
 
     if (!strcmp(argv[1], "show"))
     {
-        if ((argc == 3 && (!strcmp(argv[2], "help") || !strcmp(argv[2], "-h") || !strcmp(argv[2], "--help"))) || argc > 3)
+        if ((argc == 3 && (!strcmp(argv[2], "help") || !strcmp(argv[2], "-h") ||
+                           !strcmp(argv[2], "--help"))) ||
+            argc > 3)
         {
             fprintf(stderr, "Usage: %s show [<interface>]\n", PROG_NAME);
             return 1;
@@ -445,9 +461,12 @@ int main(int argc, char *argv[])
 
     if (!strcmp(argv[1], "create-peer"))
     {
-        if (argc != 5 || !strcmp(argv[2], "help") || !strcmp(argv[2], "-h") || !strcmp(argv[2], "--help"))
+        if (argc != 5 || !strcmp(argv[2], "help") || !strcmp(argv[2], "-h") ||
+            !strcmp(argv[2], "--help"))
         {
-            fprintf(stderr, "Usage: %s create-peer <Interface> <Peer Name> <CIDR IP>\n", PROG_NAME);
+            fprintf(stderr,
+                    "Usage: %s create-peer <Interface> <Peer Name> <CIDR IP>\n",
+                    PROG_NAME);
             return 1;
         }
         create_peer(argc, argv, dir1, f1);
@@ -456,9 +475,11 @@ int main(int argc, char *argv[])
 
     if (!strcmp(argv[1], "remove-peer"))
     {
-        if (argc != 4 || !strcmp(argv[2], "help") || !strcmp(argv[2], "-h") || !strcmp(argv[2], "--help"))
+        if (argc != 4 || !strcmp(argv[2], "help") || !strcmp(argv[2], "-h") ||
+            !strcmp(argv[2], "--help"))
         {
-            fprintf(stderr, "Usage: %s remove-peer <Interface> <Peer Name>\n", PROG_NAME);
+            fprintf(stderr, "Usage: %s remove-peer <Interface> <Peer Name>\n",
+                    PROG_NAME);
             return 1;
         }
         remove_peer(argc, argv, dir1, f1);
