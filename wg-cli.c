@@ -211,6 +211,11 @@ int create_peer(int argc, char *argv[], struct directories dir1,
         command_print(qrencode);
     }
 
+    // Restart wg
+    char restart[FILENAME_MAX] = "systemctl restart wg-quick@";
+    strcat(restart, argv[2]);
+    command_print(restart);
+
     return 0;
 }
 
@@ -350,6 +355,14 @@ int remove_peer(int argc, char *argv[], struct directories dir1,
     else if (!f1.quiet)
     {
         printf("Error: Unable to update interface \"%s\"\n", argv[2]);
+    }
+
+    if (!delete_old && !rename_temp)
+    {
+        // Restart wg
+        char restart[FILENAME_MAX] = "systemctl restart wg-quick@";
+        strcat(restart, argv[2]);
+        command_print(restart);
     }
 
     // Delete peer configuration file
